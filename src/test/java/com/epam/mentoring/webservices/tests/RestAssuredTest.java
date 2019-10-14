@@ -6,11 +6,7 @@ import io.restassured.RestAssured;
 import io.restassured.config.LogConfig;
 import io.restassured.config.RestAssuredConfig;
 import io.restassured.config.SSLConfig;
-import io.restassured.parsing.Parser;
 import io.restassured.response.Response;
-import io.restassured.response.ResponseBody;
-import io.restassured.response.ValidatableResponse;
-import org.hamcrest.Matchers;
 import org.testng.Assert;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
@@ -22,6 +18,7 @@ import static com.epam.mentoring.webservices.help.TestResource.getTestResourceAs
 import static io.restassured.RestAssured.given;
 import static io.restassured.filter.log.LogDetail.ALL;
 import static io.restassured.module.jsv.JsonSchemaValidator.matchesJsonSchema;
+import static org.hamcrest.Matchers.*;
 
 public class RestAssuredTest {
 
@@ -50,37 +47,67 @@ public class RestAssuredTest {
     @Test
     public void checkResponseHeader () {
         Response response = RestAssured.when().get("/users").andReturn();
-
         String rpContentTypeHeader = response.getHeader("Content-Type");
         Assert.assertEquals(rpContentTypeHeader, "application/json; charset=utf-8");
     }
 
     @Test
     public void CheckResponseBody () {
-        Response response = RestAssured.when().get("/users")
-
-                                       .andReturn();
-        ResponseBody<?> responseBody = response.getBody();
-        User[] users = responseBody.as(User[].class);
+        User[] users = RestAssured.when().get("/users").then().statusCode(200).extract().as(User[].class);
         Assert.assertEquals(users.length, 10);
     }
 
     @Test
     public void CheckNameResponseBody () {
-        RestAssured.defaultParser = Parser.JSON;
-        ValidatableResponse response = given().when()
-                                              .log()
-                                              .everything()
-                                              .get("/users")
-                                              .then()
-                                              .log()
-                                              .everything()
-                                              .assertThat()
-                                              .body(matchesJsonSchema(JSON_SCHEMA_FOR_GET_RESPONSE))
-                                              .statusCode(200)
-                                              .header("Content-Type", "application/json; charset=utf-8")
-                                              .body("name", Matchers.anyOf(Matchers.contains(names)))
-                                              .body("$.email", Matchers.everyItem(Matchers.matchesPattern(Pattern.compile("@"))));
+        given().when()
+               .log()
+               .everything()
+               .get("/users")
+               .then()
+               .log()
+               .everything()
+               .assertThat()
+               .body(matchesJsonSchema(JSON_SCHEMA_FOR_GET_RESPONSE))
+               .statusCode(200)
+               .header("Content-Type", "application/json; charset=utf-8")
+               .body("name", anyOf(contains(names)))
+               .body("name", anyOf(hasItem("Leanne Graham")))
+               .body("$.email", everyItem(matchesPattern(Pattern.compile("@"))));
+
+    }
+
+    @Test
+    public void CheckLengthOfStreetsResponseBody () {
+        given().when()
+               .log()
+               .everything()
+               .get("/users")
+               .then()
+               .log()
+               .everything()
+               .assertThat()
+               .body(matchesJsonSchema(JSON_SCHEMA_FOR_GET_RESPONSE))
+               .statusCode(200)
+               .header("Content-Type", "application/json; charset=utf-8")
+               .body("address.street*.length().sum()", greaterThan(50));
+
+    }
+
+    @Test
+    public void CheckSizeOfUsersResponseBody () {
+        given().when()
+               .log()
+               .everything()
+               .get("/users")
+               .then()
+               .log()
+               .everything()
+               .assertThat()
+               .body(matchesJsonSchema(JSON_SCHEMA_FOR_GET_RESPONSE))
+               .statusCode(200)
+               .header("Content-Type", "application/json; charset=utf-8")
+               .body("id.size()", is(10))
+               .body("id.sum()", is(55));
 
     }
 }
